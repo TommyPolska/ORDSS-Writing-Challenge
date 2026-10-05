@@ -19,31 +19,6 @@ import type {
   User,
 } from '../types/auth.types';
 
-export const EMAIL_NOT_VERIFIED = 'auth/email-not-verified';
-
-const VERIFY_EMAIL_SETTINGS = () => ({
-  url: window.location.origin + '/auth/verify-email',
-  handleCodeInApp: false,
-});
-
-function emailNotVerifiedError(): Error {
-  const error = new Error('Please verify your email before signing in. Check your inbox for the verification link.');
-  (error as Error & { code: string }).code = EMAIL_NOT_VERIFIED;
-  return error;
-}
-
-function friendlyResendError(error: unknown): Error {
-  const code = (error as { code?: string })?.code;
-  if (code === 'auth/too-many-requests') {
-    return new Error('Too many attempts. Please wait a few minutes before requesting another email.');
-  }
-  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
-    return new Error('Invalid email or password.');
-  }
-  if (error instanceof Error) return error;
-  return new Error('Failed to resend verification email. Please try again.');
-}
-
 export class AuthService {
   private static buildFallbackUser(firebaseUser: FirebaseUser): User {
     const displayNameParts = (firebaseUser.displayName || '').trim().split(/\s+/).filter(Boolean);
@@ -72,10 +47,8 @@ export class AuthService {
     // Check if email is verified (already available from signIn, no reload needed)
     if (!firebaseUser.emailVerified) {
       await firebaseSignOut(auth);
-      throw emailNotVerifiedError();
+      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
     }
-
-    setDoc(doc(db, 'users', firebaseUser.uid), { emailVerified: true }, { merge: true }).catch(() => {});
 
     // Start profile fetch but don't block sign-in on it
     const profilePromise = this.getUserProfile(firebaseUser.uid).catch((error) => {
@@ -126,7 +99,10 @@ export class AuthService {
     };
 
     // Require verification email send to succeed before returning success to UI.
-    await sendEmailVerification(firebaseUser, VERIFY_EMAIL_SETTINGS());
+    await sendEmailVerification(firebaseUser, {
+      url: window.location.origin + '/auth/sign-in',
+      handleCodeInApp: false,
+    });
 
     // IMPORTANT: Wait for profile creation to complete before signing out
     // This ensures the profile exists in Firestore before the user can sign in
@@ -182,48 +158,29 @@ export class AuthService {
   }
 
   // Resend verification email
-  static async resendVerificationEmail(
-    credentials?: SignInRequest,
-  ): Promise<{ success: boolean; message: string }> {
+  static async resendVerificationEmail({ email, password }: SignInRequest): Promise<{ success: boolean; message: string }> {
     await authReady;
-
-    let firebaseUser: FirebaseUser | null = auth.currentUser;
-    let signedInHere = false;
-
-    if (credentials) {
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
-        firebaseUser = userCredential.user;
-        signedInHere = true;
-      } catch (error) {
-        throw friendlyResendError(error);
-      }
-    }
-
-    if (!firebaseUser) {
-      throw new Error('Enter your email and password so we know where to send the verification link.');
-    }
+    const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
 
     try {
       if (firebaseUser.emailVerified) {
         return {
           success: false,
-          message: 'Your email is already verified. You can sign in.',
+          message: 'Your email is already verified',
         };
       }
 
-      await sendEmailVerification(firebaseUser, VERIFY_EMAIL_SETTINGS());
+      await sendEmailVerification(firebaseUser, {
+        url: window.location.origin + '/auth/sign-in',
+        handleCodeInApp: false,
+      });
 
       return {
         success: true,
         message: 'Verification email sent! Please check your inbox and spam folder.',
       };
-    } catch (error) {
-      throw friendlyResendError(error);
     } finally {
-      if (signedInHere) {
-        await firebaseSignOut(auth).catch(() => {});
-      }
+      await firebaseSignOut(auth);
     }
   }
 

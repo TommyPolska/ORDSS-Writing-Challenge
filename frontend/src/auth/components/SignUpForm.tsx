@@ -4,6 +4,7 @@ import { FaUser, FaEnvelope, FaLock, FaEye, FaEyeSlash, FaShieldAlt, FaCheckCirc
 import { useFormValidation } from '../hooks/useFormValidation';
 import { AuthService } from '../services/auth.service';
 import type { FormErrors } from '../types/auth.types';
+import ResendVerificationLink, { linkClass } from './ResendVerificationLink';
 
 interface SignUpFormProps {
   onSuccess?: () => void;
@@ -25,24 +26,6 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [sentToEmail, setSentToEmail] = useState('');
   const [signUpMessage, setSignUpMessage] = useState('');
-  const [isResending, setIsResending] = useState(false);
-  const [resendMessage, setResendMessage] = useState('');
-
-  const handleResend = async () => {
-    setIsResending(true);
-    setResendMessage('');
-    try {
-      const response = await AuthService.resendVerificationEmail({
-        email: sentToEmail,
-        password: formData.password,
-      });
-      setResendMessage(response.message);
-    } catch (error: any) {
-      setResendMessage(error?.message || 'Failed to resend verification email. Please try again.');
-    } finally {
-      setIsResending(false);
-    }
-  };
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordChecks, setPasswordChecks] = useState({
@@ -181,9 +164,6 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess }) => {
           We sent a verification link to <span className="font-semibold text-text">{sentToEmail}</span>.
           Click the link in your inbox (check spam too), then sign in.
         </p>
-        {resendMessage && (
-          <p className="max-w-sm text-sm text-text">{resendMessage}</p>
-        )}
         <button
           type="button"
           onClick={() => navigate('/')}
@@ -193,14 +173,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess }) => {
         </button>
         <div className="mt-2">
           <span className="text-sm font-medium text-text">Didn&apos;t get it?</span>
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={isResending}
-            className="ml-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isResending ? 'Sending…' : 'Resend verification email'}
-          </button>
+          <ResendVerificationLink email={sentToEmail} password={formData.password} className="ml-1 font-medium" />
         </div>
       </div>
     );
@@ -392,7 +365,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess }) => {
         <button
           type="button"
           onClick={() => navigate('/auth/sign-in')}
-          className="ml-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+          className={`${linkClass} ml-1 font-medium`}
           disabled={isLoading}
         >
           Sign in here
