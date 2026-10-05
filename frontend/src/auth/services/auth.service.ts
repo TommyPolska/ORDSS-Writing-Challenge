@@ -19,8 +19,6 @@ import type {
   User,
 } from '../types/auth.types';
 
-// Error code thrown by signIn when the account exists but the email is unverified.
-// UI code should check this instead of matching on the message text.
 export const EMAIL_NOT_VERIFIED = 'auth/email-not-verified';
 
 const VERIFY_EMAIL_SETTINGS = () => ({
@@ -34,7 +32,6 @@ function emailNotVerifiedError(): Error {
   return error;
 }
 
-// Turn Firebase's error codes into something a user can act on.
 function friendlyResendError(error: unknown): Error {
   const code = (error as { code?: string })?.code;
   if (code === 'auth/too-many-requests') {
@@ -78,7 +75,6 @@ export class AuthService {
       throw emailNotVerifiedError();
     }
 
-    // Keep the Firestore flag in step with Firebase Auth. Not awaited: sign-in must not block on it.
     setDoc(doc(db, 'users', firebaseUser.uid), { emailVerified: true }, { merge: true }).catch(() => {});
 
     // Start profile fetch but don't block sign-in on it
@@ -185,12 +181,7 @@ export class AuthService {
     };
   }
 
-  // Resend verification email.
-  //
-  // Unverified users are never left signed in (signUp and signIn both sign them out),
-  // so there is normally no auth.currentUser to send from. Pass the user's credentials
-  // and this will sign in, send the email, and sign straight back out. Without
-  // credentials it falls back to whoever is currently signed in.
+  // Resend verification email
   static async resendVerificationEmail(
     credentials?: SignInRequest,
   ): Promise<{ success: boolean; message: string }> {
@@ -230,7 +221,6 @@ export class AuthService {
     } catch (error) {
       throw friendlyResendError(error);
     } finally {
-      // Never leave an unverified session behind; that is what the rest of the app assumes.
       if (signedInHere) {
         await firebaseSignOut(auth).catch(() => {});
       }

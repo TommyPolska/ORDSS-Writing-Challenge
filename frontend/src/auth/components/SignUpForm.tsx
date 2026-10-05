@@ -28,7 +28,6 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess }) => {
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
 
-
   const handleResend = async () => {
     setIsResending(true);
     setResendMessage('');

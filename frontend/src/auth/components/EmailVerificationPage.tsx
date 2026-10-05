@@ -18,14 +18,10 @@ const EmailVerificationPage: React.FC = () => {
   const [isResending, setIsResending] = useState(false);
   const [message, setMessage] = useState('');
   const [isVerified, setIsVerified] = useState(false);
-
-  // Credentials for resending when there is no session to send from.
   const [resendEmail, setResendEmail] = useState('');
   const [resendPassword, setResendPassword] = useState('');
 
   useEffect(() => {
-    // Take only the first auth event: that is the restored session (or none).
-    // Later events come from our own resend sign-in/sign-out and must not flip the UI.
     let settled = false;
     const unsubscribe = AuthService.onAuthStateChanged((firebaseUser) => {
       if (settled) return;
